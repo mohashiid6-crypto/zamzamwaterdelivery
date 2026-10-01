@@ -16,7 +16,9 @@ public static class DependencyInjection
 {
     public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
     {
-        var connectionString = configuration.GetConnectionString("DefaultConnection")
+        // DATABASE_URL is what hosts such as Railway provide for an attached PostgreSQL database.
+        var connectionString = configuration["DATABASE_URL"].NullIfEmpty()
+            ?? configuration.GetConnectionString("DefaultConnection")
             ?? throw new InvalidOperationException("Connection string 'DefaultConnection' is not configured.");
 
         // SQL Server locally; PostgreSQL when hosted (e.g. Railway, which provides a postgresql:// URL).
@@ -56,6 +58,8 @@ public static class DependencyInjection
 
         return services;
     }
+
+    private static string? NullIfEmpty(this string? value) => string.IsNullOrWhiteSpace(value) ? null : value;
 
     private static bool IsPostgres(string? provider, string connectionString)
     {

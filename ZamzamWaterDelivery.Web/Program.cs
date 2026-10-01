@@ -30,10 +30,8 @@ Ui.CurrencySymbol = company.CurrencySymbol;
 var jwt = config.GetSection(JwtSettings.SectionName).Get<JwtSettings>() ?? new JwtSettings();
 if (string.IsNullOrWhiteSpace(jwt.Key))
 {
-    if (!builder.Environment.IsDevelopment())
-        throw new InvalidOperationException("Jwt:Key must be configured (environment variable Jwt__Key or a secret store).");
-
-    // Development fallback: an ephemeral key (API tokens become invalid when the app restarts).
+    // Fallback: an ephemeral key (API tokens become invalid when the app restarts).
+    // Set Jwt__Key in the environment to keep tokens valid across restarts.
     jwt.Key = Convert.ToBase64String(RandomNumberGenerator.GetBytes(48));
     config[$"{JwtSettings.SectionName}:Key"] = jwt.Key;
 }

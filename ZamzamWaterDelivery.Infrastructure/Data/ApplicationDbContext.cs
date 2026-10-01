@@ -26,15 +26,25 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
         base.OnModelCreating(builder);
         builder.ApplyConfigurationsFromAssembly(typeof(ApplicationDbContext).Assembly);
 
-        // Filtered unique indexes are written in SQL Server syntax ("[IsDeleted] = 0"); translate for PostgreSQL.
+        // Index filters and check constraints are written in SQL Server syntax ("[IsDeleted] = 0"); translate for PostgreSQL.
         if (Database.IsNpgsql())
         {
-            foreach (var index in builder.Model.GetEntityTypes().SelectMany(e => e.GetIndexes()))
+            foreach (var entity in builder.Model.GetEntityTypes())
             {
-                var filter = index.GetFilter();
-                if (filter is null) continue;
-                index.SetFilter(filter.Replace("[", "\"").Replace("]", "\"").Replace("= 0", "= false").Replace("= 1", "= true"));
+                foreach (var index in entity.GetIndexes())
+                {
+                    var filter = index.GetFilter();
+                    if (filter is not null)
+                        index.SetFilter(ToPostgresSql(filter).Replace("= 0", "= false").Replace("= 1", "= true"));
+                }
+                foreach (var check in entity.GetCheckConstraints().ToList())
+                {
+                    entity.RemoveCheckConstraint(check.ModelName);
+                    entity.AddCheckConstraint(check.ModelName, ToPostgresSql(check.Sql));
+                }
             }
         }
     }
+
+    private static string ToPostgresSql(string sql) => sql.Replace("[", "\"").Replace("]", "\"");
 }

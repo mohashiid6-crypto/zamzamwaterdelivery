@@ -25,5 +25,16 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
     {
         base.OnModelCreating(builder);
         builder.ApplyConfigurationsFromAssembly(typeof(ApplicationDbContext).Assembly);
+
+        // Filtered unique indexes are written in SQL Server syntax ("[IsDeleted] = 0"); translate for PostgreSQL.
+        if (Database.IsNpgsql())
+        {
+            foreach (var index in builder.Model.GetEntityTypes().SelectMany(e => e.GetIndexes()))
+            {
+                var filter = index.GetFilter();
+                if (filter is null) continue;
+                index.SetFilter(filter.Replace("[", "\"").Replace("]", "\"").Replace("= 0", "= false").Replace("= 1", "= true"));
+            }
+        }
     }
 }

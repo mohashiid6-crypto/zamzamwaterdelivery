@@ -37,8 +37,17 @@ public static class DbSeeder
 
         if (applyMigrations)
         {
-            logger.LogInformation("Applying database migrations...");
-            await db.Database.MigrateAsync();
+            if (db.Database.IsSqlServer())
+            {
+                logger.LogInformation("Applying database migrations...");
+                await db.Database.MigrateAsync();
+            }
+            else
+            {
+                // The migrations are SQL Server specific; other providers get the schema straight from the model.
+                logger.LogInformation("Creating database schema if it does not exist...");
+                await db.Database.EnsureCreatedAsync();
+            }
         }
         if (!settings.Enabled) return;
 

@@ -19,12 +19,24 @@ public static class DependencyInjection
         var connectionString = configuration.GetConnectionString("DefaultConnection")
             ?? throw new InvalidOperationException("Connection string 'DefaultConnection' is not configured.");
 
-        services.AddDbContext<ApplicationDbContext>(options =>
-            options.UseSqlServer(connectionString, sql =>
-            {
-                sql.MigrationsAssembly(typeof(ApplicationDbContext).Assembly.FullName);
-                sql.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery);
-            }));
+        // SQL Server locally; PostgreSQL when hosted (e.g. Railway, which provides a postgresql:// URL).
+        if (IsPostgres(configuration["Database:Provider"], connectionString))
+        {
+            // Keep DateTime behaviour the same as on SQL Server (no forced UTC kinds).
+            AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
+            var npgsqlConnection = ToNpgsqlConnectionString(connectionString);
+            services.AddDbContext<ApplicationDbContext>(options =>
+                options.UseNpgsql(npgsqlConnection, pg => pg.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery)));
+        }
+        else
+        {
+            services.AddDbContext<ApplicationDbContext>(options =>
+                options.UseSqlServer(connectionString, sql =>
+                {
+                    sql.MigrationsAssembly(typeof(ApplicationDbContext).Assembly.FullName);
+                    sql.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery);
+                }));
+        }
 
         services.AddScoped<IUnitOfWork, UnitOfWork>();
         services.AddScoped(typeof(IRepository<>), typeof(Repository<>));
@@ -43,5 +55,27 @@ public static class DependencyInjection
         services.AddSingleton<IReportExporter, PdfReportExporter>();
 
         return services;
+    }
+
+    private static bool IsPostgres(string? provider, string connectionString)
+    {
+        if (!string.IsNullOrWhiteSpace(provider))
+            return provider.StartsWith("postgres", StringComparison.OrdinalIgnoreCase) || provider.Equals("Npgsql", StringComparison.OrdinalIgnoreCase);
+
+        return connectionString.StartsWith("postgres://", StringComparison.OrdinalIgnoreCase)
+            || connectionString.StartsWith("postgresql://", StringComparison.OrdinalIgnoreCase)
+            || connectionString.Contains("Host=", StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>Converts a postgresql://user:pass@host:port/db URL into an Npgsql key/value connection string.</summary>
+    private static string ToNpgsqlConnectionString(string connectionString)
+    {
+        if (!connectionString.Contains("://")) return connectionString;
+
+        var uri = new Uri(connectionString);
+        var userInfo = uri.UserInfo.Split(':', 2);
+        return $"Host={uri.Host};Port={(uri.Port > 0 ? uri.Port : 5432)};Database={uri.AbsolutePath.TrimStart('/')};" +
+               $"Username={Uri.UnescapeDataString(userInfo[0])};Password={(userInfo.Length > 1 ? Uri.UnescapeDataString(userInfo[1]) : "")};" +
+               "SSL Mode=Prefer;Trust Server Certificate=true";
     }
 }

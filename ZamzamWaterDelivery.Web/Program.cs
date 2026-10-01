@@ -2,6 +2,7 @@ using System.Reflection;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.IdentityModel.Tokens;
@@ -152,12 +153,21 @@ builder.Services.AddSwaggerGen(options =>
 
 builder.Services.AddHsts(options => options.MaxAge = TimeSpan.FromDays(180));
 
+// Hosting platforms (e.g. Railway) terminate HTTPS at a proxy and forward the original scheme.
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    options.KnownNetworks.Clear();
+    options.KnownProxies.Clear();
+});
+
 var app = builder.Build();
 
 // ---------- Database ----------
 await DbSeeder.MigrateAndSeedAsync(app.Services, config.GetValue("Database:ApplyMigrationsOnStartup", true));
 
 // ---------- Pipeline ----------
+app.UseForwardedHeaders();
 app.UseExceptionHandler("/Home/Error");
 if (!app.Environment.IsDevelopment()) app.UseHsts();
 

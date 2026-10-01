@@ -10,7 +10,7 @@ public class CategoryConfiguration : IEntityTypeConfiguration<Category>
     {
         b.Property(c => c.Name).HasMaxLength(80).IsRequired();
         b.Property(c => c.Description).HasMaxLength(500);
-        b.HasIndex(c => c.Name).IsUnique().HasFilter("[IsDeleted] = 0");
+        b.HasIndex(c => c.Name).IsUnique().HasFilter("\"IsDeleted\" = false");
     }
 }
 
@@ -20,8 +20,8 @@ public class ProductConfiguration : IEntityTypeConfiguration<Product>
     {
         b.ToTable(t =>
         {
-            t.HasCheckConstraint("CK_Products_StockQuantity", "[StockQuantity] >= 0");
-            t.HasCheckConstraint("CK_Products_Price", "[Price] > 0");
+            t.HasCheckConstraint("CK_Products_StockQuantity", "\"StockQuantity\" >= 0");
+            t.HasCheckConstraint("CK_Products_Price", "\"Price\" > 0");
         });
 
         b.Property(p => p.Name).HasMaxLength(100).IsRequired();
@@ -29,7 +29,7 @@ public class ProductConfiguration : IEntityTypeConfiguration<Product>
         b.Property(p => p.Price).HasPrecision(18, 2);
         b.Property(p => p.ImageUrl).HasMaxLength(500);
 
-        b.HasIndex(p => p.Name).IsUnique().HasFilter("[IsDeleted] = 0");
+        b.HasIndex(p => p.Name).IsUnique().HasFilter("\"IsDeleted\" = false");
         b.HasIndex(p => new { p.IsDeleted, p.IsActive });
 
         b.HasOne(p => p.Category)
@@ -56,7 +56,7 @@ public class CartItemConfiguration : IEntityTypeConfiguration<CartItem>
 {
     public void Configure(EntityTypeBuilder<CartItem> b)
     {
-        b.ToTable(t => t.HasCheckConstraint("CK_CartItems_Quantity", "[Quantity] > 0"));
+        b.ToTable(t => t.HasCheckConstraint("CK_CartItems_Quantity", "\"Quantity\" > 0"));
         b.HasIndex(i => new { i.CartId, i.ProductId }).IsUnique();
 
         b.HasOne(i => i.Cart)
@@ -70,3 +70,4 @@ public class CartItemConfiguration : IEntityTypeConfiguration<CartItem>
             .OnDelete(DeleteBehavior.Cascade);
     }
 }
+
